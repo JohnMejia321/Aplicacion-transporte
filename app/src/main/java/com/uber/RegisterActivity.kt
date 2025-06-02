@@ -2,16 +2,22 @@ package com.uber
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import android.view.WindowManager
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import com.uber.databinding.ActivityRegisterBinding
 import android.widget.Toast
+import com.uber.models.Client
+import com.uber.providers.AuthProvider
+import com.uber.providers.ClientProvider
 
 
 class RegisterActivity: AppCompatActivity() {
 
     private lateinit var binding: ActivityRegisterBinding
+    private val authProvider = AuthProvider()
+    private val clientProvider = ClientProvider()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -22,7 +28,7 @@ class RegisterActivity: AppCompatActivity() {
        binding.btnRegister.setOnClickListener { register() }
     }
 
-  private fun register() {
+    private fun register() {
         val name = binding.textFieldName.text.toString()
         val lastname = binding.textFieldLastname.text.toString()
         val email = binding.textFieldEmail.text.toString()
@@ -30,9 +36,39 @@ class RegisterActivity: AppCompatActivity() {
         val password = binding.textFieldPassword.text.toString()
         val confirmPassword = binding.textFieldConfirmPassword.text.toString()
         if (isValidForm(name, lastname, email, phone, password, confirmPassword)) {
-            Toast.makeText(this, "Formulario es valido", Toast.LENGTH_SHORT).show()
+            authProvider.register(email, password).addOnCompleteListener {
+                if (it.isSuccessful) {
+                    val client = Client(
+                        id = authProvider.getId(),
+                        name = name,
+                        lastname = lastname,
+                        phone = phone,
+                        email = email
+                    )
+                    clientProvider.create(client).addOnCompleteListener {
+                        if (it.isSuccessful) {
+                            Toast.makeText(this@RegisterActivity, "Registro exitoso", Toast.LENGTH_SHORT).show()
+                            goToMap()
+                        }
+                        else {
+                            Toast.makeText(this@RegisterActivity, "Hubo un error Almacenado los datos del usuario ${it.exception.toString()}", Toast.LENGTH_SHORT).show()
+                            Log.d("FIREBASE", "Error: ${it.exception.toString()}")
+                        }
+                    }
+                }
+                else {
+                    Toast.makeText(this@RegisterActivity, "Registro fallido ${it.exception.toString()}", Toast.LENGTH_LONG).show()
+                    Log.d("FIREBASE", "Error: ${it.exception.toString()}")
+                }
+            }
         }
 
+    }
+
+    private fun goToMap() {
+        val i = Intent(this, MapActivity::class.java)
+        i.flags = Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_NEW_TASK
+        startActivity(i)
     }
 
     private fun isValidForm(
